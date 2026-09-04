@@ -1,0 +1,11 @@
+{
+  "host": "127.0.0.1",
+  "port": 8787,
+  "webhookPath": "/github/webhook",
+  "maxBodyBytes": 1048576,
+  "routes": [
+    { "repository": "owner/repository", "targetPort": 8788 }
+  ],
+  "recoveryCredentialsConfigPath": "/absolute/path/to/instance/config.json",
+  "recoveryStatePath": "/absolute/path/to/recovery-state.json"
+}

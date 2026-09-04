@@ -1,0 +1,15 @@
+{
+  "name": "loop-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "loop-agent": "bin/loop-agent.mjs"
+  },
+  "scripts": {
+    "check": "node --check bin/loop-agent.mjs && node --check src/control.mjs && node --check src/bridge.mjs && node --check src/router/router.mjs && node --check src/router/recover-failed-deliveries.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

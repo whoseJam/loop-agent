@@ -1,0 +1,7 @@
+node_modules/
+*.log
+state.json
+stopped
+paused
+config.local.json
+recovery-state.json
