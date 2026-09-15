@@ -30,4 +30,3 @@ if (command === "list") {
 } else {
   throw new Error("usage: todo-control.mjs CONFIG [list|add|complete]");
 }
-
