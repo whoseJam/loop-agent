@@ -21,6 +21,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { resolveInstance } from "./instance.mjs";
+import { setThreadGoal } from "./goal.mjs";
 import { recordTodoEvents } from "./todo.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -32,6 +33,7 @@ const todoPath = join(instanceDirectory, "todo.md");
 const stoppedPath = join(instanceDirectory, "stopped");
 const legacyPausedPath = join(instanceDirectory, "paused");
 const logPrefix = "[loop-agent]";
+const maximumRetryDelayMs = 5 * 60 * 1000;
 
 function log(message, details) {
   const suffix = details === undefined ? "" : ` ${JSON.stringify(details)}`;
@@ -524,11 +526,7 @@ async function acknowledgeHumanReply(event, config) {
 }
 
 async function runCodex(events, config) {
-  await execFileAsync(process.execPath, [
-    join(scriptDirectory, "goal-control.mjs"),
-    defaultConfigPath,
-    "active",
-  ]);
+  await setThreadGoal(config, "active", goalObjective(config));
   await execFileAsync(
     config.codexPath,
     [
@@ -547,11 +545,24 @@ async function runCodex(events, config) {
   };
 }
 
+function goalObjective(config) {
+  const todoControlPath = join(scriptDirectory, "todo-control.mjs");
+  return `${config.goalObjective}\n\n持久 TODO 协议：${todoPath} 是本线程跨消息、上下文压缩和重启后的权威待办账本。每次收到新消息，先读取它；若消息没有 webhook delivery 条目但产生任务或决策，先运行 node ${todoControlPath} ${defaultConfigPath} add --summary <摘要> 登记。新任务不得打断未到安全边界的当前任务。只有条目要求全部完成后，运行同一工具的 complete <id> --evidence <证据> 核销；消息已投递、已阅读或已开始都不算完成。不得仅依赖对话记忆保存待办。`;
+}
+
+export function retryDelayMs(attempt, debounceMs) {
+  return Math.min(
+    Math.max(debounceMs, 1000) * 2 ** Math.min(attempt, 8),
+    maximumRetryDelayMs,
+  );
+}
+
 let state = null;
 let config = null;
 let drainTimer = null;
 let draining = false;
 let paused = false;
+let failedDrainAttempts = 0;
 
 async function readPaused() {
   try {
@@ -583,11 +594,10 @@ async function drain() {
   draining = true;
   const events = state.pending.splice(0, state.pending.length);
   await saveState(state);
-  let queued = false;
   try {
     await recordTodoEvents(todoPath, events);
     const result = await runCodex(events, config);
-    queued = true;
+    failedDrainAttempts = 0;
     advanceResourceCursors(state, events);
     state.lastRun = {
       completedAt: new Date().toISOString(),
@@ -597,6 +607,7 @@ async function drain() {
     };
     log("Codex message queued", state.lastRun);
   } catch (error) {
+    failedDrainAttempts += 1;
     state.pending.unshift(...events);
     state.lastRun = {
       completedAt: new Date().toISOString(),
@@ -608,7 +619,13 @@ async function drain() {
   } finally {
     await saveState(state);
     draining = false;
-    if (queued && state.pending.length > 0) scheduleDrain(config.debounceMs);
+    if (!paused && state.pending.length > 0) {
+      scheduleDrain(
+        failedDrainAttempts === 0
+          ? config.debounceMs
+          : retryDelayMs(failedDrainAttempts - 1, config.debounceMs),
+      );
+    }
   }
 }
 
