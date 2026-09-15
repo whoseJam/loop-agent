@@ -7,7 +7,7 @@
     "loop-agent": "bin/loop-agent.mjs"
   },
   "scripts": {
-    "check": "node --check bin/loop-agent.mjs && node --check src/control.mjs && node --check src/bridge.mjs && node --check src/router/router.mjs && node --check src/router/recover-failed-deliveries.mjs"
+    "check": "node --check bin/loop-agent.mjs && node --check src/control.mjs && node --check src/bridge.mjs && node --check src/todo.mjs && node --check src/todo-control.mjs && node --check src/router/router.mjs && node --check src/router/recover-failed-deliveries.mjs && node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=22"
