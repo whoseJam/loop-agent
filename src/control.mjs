@@ -7,12 +7,14 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 import { readInstanceConfig, resolveInstance } from "./instance.mjs";
+import { unfinishedTodos } from "./todo.mjs";
 
 const execFileAsync = promisify(execFile);
 const runtimeDirectory = dirname(fileURLToPath(import.meta.url));
 const { configPath, instanceDirectory } = resolveInstance(process.argv[2]);
 const config = await readInstanceConfig(configPath);
 const statePath = join(instanceDirectory, "state.json");
+const todoPath = join(instanceDirectory, "todo.md");
 const stoppedPath = join(instanceDirectory, "stopped");
 const legacyPausedPath = join(instanceDirectory, "paused");
 const goalControlPath = join(runtimeDirectory, "goal-control.mjs");
@@ -152,6 +154,12 @@ async function status() {
   } catch {
     state = null;
   }
+  let todoCount = "未知";
+  try {
+    todoCount = (await unfinishedTodos(todoPath)).length;
+  } catch {
+    todoCount = "读取失败";
+  }
   process.stdout.write(
     [
       `TUI: ${(await running()) ? ((await working()) ? "运行中（工作中）" : "运行中（空闲）") : "未运行"}`,
@@ -160,6 +168,7 @@ async function status() {
       `Goal: ${await goalStatus()}`,
       `接收新任务: ${(await exists(stoppedPath)) || (await exists(legacyPausedPath)) ? "已停止" : "正常"}`,
       `待投递事件: ${state?.pending?.length ?? "未知"}`,
+      `未完成 TODO: ${todoCount}`,
       `Thread: ${config.threadId}`,
     ].join("\n") + "\n",
   );

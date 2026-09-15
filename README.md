@@ -35,3 +35,17 @@ instance selection does not depend on environment variables. See
 `WHOSE_AGENT_WORKER=1` is retained only as a security identity marker that
 prevents an agent from controlling its own lifecycle; it does not select or
 configure an instance.
+
+## Durable TODO ledger
+
+Each instance owns a human-readable `todo.md` beside `state.json`. The bridge
+records every accepted webhook delivery there before queueing it to Codex,
+using the GitHub delivery ID for idempotency. Queue acceptance never completes
+or removes an entry.
+
+The Goal and every webhook prompt require the agent to read this ledger before
+acting. Direct TUI requests are added with `todo-control.mjs add`; an entry is
+checked only with `todo-control.mjs complete` after the work is actually done,
+with completion evidence retained in the file. This makes unfinished work
+recoverable after context compaction or a thread/process restart without an
+opaque `inflight` state.
